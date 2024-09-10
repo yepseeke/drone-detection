@@ -18,7 +18,7 @@ original_data_folder_path = r'original_data'
 
 def load_json(file_path):
     """
-        Reads the contents of a JSON file
+        Reads the contents of the JSON file
 
         :param file_path: The path to the JSON file that needs to be read.
         :return: The data extracted from the JSON file.
@@ -30,7 +30,7 @@ def load_json(file_path):
 
 def save_json(file_path, data):
     """
-        Saves the provided data to a JSON file at the specified file path.
+        Saves the provided data to the JSON file at the specified file path.
 
         :param file_path: The path to the JSON file where the data will be saved.
         :param data: The data to be saved in the JSON file.
@@ -235,7 +235,7 @@ def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp'):
 
 def split_sounds(cuts_folder_path, train_folder_path, valid_folder_path):
     """
-        Splits whole audios into train data and valid data in a ratio of 4 to 1.
+        Splits whole audios into train data and valid data in a ratio of 4/1.
 
         cuts_folder_path/
         └── object_names/   Folder where the audio segments will be stored
@@ -303,7 +303,7 @@ def convert_gray2rgb(image):
 
 def normalize_scaleogram(coefs):
     """
-         Normalizes the scaleogram data to a range of [0, 255].
+        Normalizes the scaleogram data to a range of [0, 255].
 
         :param coefs: The scaleogram data.
         :return: Normalized scaleogram data.
