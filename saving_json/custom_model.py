@@ -12,7 +12,32 @@ from datetime import datetime
 from dataset_processing import load_json, save_json
 
 
+# TODO add FFT, get rid of permutations
 class CustomModel:
+    """
+    The CustomModel class represents a customizable model designed for working with various architectures and data
+    transformations.
+
+    Attributes:
+    ----------
+
+    model_name : str
+        The name of the model architecture to be used. For example 'resnet18', 'vgg13_bn'
+    num_classes : int, default is 10
+        The number of output classes the model will predict. Defaults to 10 classes.
+    transform_type : str, default is 'wavelet-cmor1.2-3'
+        The type of transformation to apply to input data before feeding it into the model. By default, it uses
+        a Continuous Morlet Wavelet Transform with parameters 1.2 and 3 (cmor1.2-3).
+    pretrained : bool, default is True
+        If True, the model will load pretrained weights.
+
+    Example usage:
+    --------------
+    model = CustomModel('resnet50', num_classes=100, transform_type='fft', pretrained=False)
+
+    In this example, a ResNet50 model is created with 100 output classes, using an FFT transformation on the input data
+    without loading pretrained weights.
+    """
 
     def __init__(self, model_name: str, num_classes: int = 10, transform_type: str = 'wavelet-cmor1.2-3',
                  pretrained: bool = True):
@@ -29,8 +54,29 @@ class CustomModel:
         self.model.to(self.device)
 
     def train_model(self, train_loader: DataLoader, valid_loader: DataLoader, epochs: int = 20, learning_rate=0.01,
-                    is_accuracy=False, save=True, save_config=True):
+                    save=True, save_config=True):
+        """
+            Trains the model using the provided training and validation datasets,
+            with options to save the model and its configuration.
 
+            Parameters:
+            -----------
+
+            train_loader : DataLoader
+                DataLoader for the training dataset, supplying batches of data for model training.
+            valid_loader : DataLoader
+                DataLoader for the validation dataset, used to assess model performance after each epoch.
+            epochs : int, default is 20
+                The number of complete passes through the training dataset.
+            learning_rate : float, default is 0.01
+                The learning rate for the optimization algorithm, determining the step size in gradient descent.
+            save : bool, default is True
+                If True, the trained model is saved to disk at the end of training.
+                ../models/new_model.pth
+            save_config : bool, default is True
+                If True, the model's configuration (such as model_name, model_id, end time of training,
+                epochs, loss and transform type)
+        """
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
 
@@ -42,6 +88,7 @@ class CustomModel:
             self.model.train()
             for batch_idx, (data, targets) in enumerate(train_loader):
                 data, targets = data.to(device=self.device), targets.to(device=self.device)
+                # TODO fix permute
                 data = data.permute(0, 3, 1, 2).float()
                 scores = self.model(data)
                 loss = criterion(scores, targets)
@@ -54,15 +101,14 @@ class CustomModel:
 
             avg_loss = sum(losses) / len(losses)
 
-            if is_accuracy:
-                self.check_accuracy(valid_loader)
+            val_accuracy = self.check_accuracy(valid_loader)
 
             print(f'Epoch {epoch}: Average epoch loss = {avg_loss:.4f}')
 
+        end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         if save:
             self.save(optimizer, epochs, avg_loss)
-
-        end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if save_config:
             new_entry = {
@@ -88,7 +134,19 @@ class CustomModel:
         checkpoint = torch.load(weights_path)
         self.model.load_state_dict(checkpoint)
 
+
     def check_accuracy(self, loader: DataLoader):
+        """
+            Evaluates the accuracy of the model on the provided dataset.
+
+            Parameters:
+            -----------
+                loader : DataLoader
+                A DataLoader object containing the dataset over which the accuracy  will be calculated.
+            Returns:
+            --------
+                float:
+        """
         num_correct = 0
         num_samples = 0
         self.model.eval()
@@ -102,7 +160,7 @@ class CustomModel:
                 num_correct += (predictions == y).sum().item()
                 num_samples += predictions.size(0)
 
-        accuracy = num_correct / num_samples
+        accuracy = float(num_correct / num_samples)
         print(f'Accuracy: {accuracy * 100:.5f}%')
 
         return accuracy
@@ -116,6 +174,10 @@ class CustomModel:
 
     def save(self, optimizer, epoch, loss):
         checkpoint_filename = f'{self.model_name}_{self.model_id}.pth'
+
+        if not os.path.isdir('models'):
+            os.mkdir('models')
+
         checkpoint_filepath = os.path.join('models', checkpoint_filename)
 
         torch.save({
