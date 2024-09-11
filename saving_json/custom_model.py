@@ -47,6 +47,7 @@ class CustomModel:
         self.num_classes = num_classes
         self.transform_type = transform_type
         self.pretrained = pretrained
+        self.epochs_trained = 0
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -106,16 +107,19 @@ class CustomModel:
             print(f'Epoch {epoch}: Average epoch loss = {avg_loss:.4f}')
 
         end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.model_id = str(uuid.uuid4())
+
+        self.epochs_trained += epochs
 
         if save:
-            self.save(optimizer, epochs, avg_loss)
+            self.save(optimizer, avg_loss)
 
         if save_config:
             new_entry = {
-                "model_name": self.model_name,
                 "model_id": self.model_id,
+                "model_name": self.model_name,
                 "end_time": end_time,
-                "epoch": epochs,
+                "epoch": self.epochs_trained,
                 "loss": avg_loss,
                 "tranform": self.transform_type
             }
@@ -133,7 +137,6 @@ class CustomModel:
     def load_weights(self, weights_path: str):
         checkpoint = torch.load(weights_path)
         self.model.load_state_dict(checkpoint)
-
 
     def check_accuracy(self, loader: DataLoader):
         """
@@ -172,8 +175,8 @@ class CustomModel:
     def summary(self):
         print(self.model)
 
-    def save(self, optimizer, epoch, loss):
-        checkpoint_filename = f'{self.model_name}_{self.model_id}.pth'
+    def save(self, optimizer, loss):
+        checkpoint_filename = f'{self.model_id}.pth'
 
         if not os.path.isdir('models'):
             os.mkdir('models')
@@ -181,13 +184,14 @@ class CustomModel:
         checkpoint_filepath = os.path.join('models', checkpoint_filename)
 
         torch.save({
-            'epoch': epoch,
+            'epoch': self.epochs_trained,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'loss': loss,
         }, checkpoint_filepath)
 
     def _get_model(self):
+        model = None
         if self.model_name == 'resnet18':
             model = models.resnet18(pretrained=self.pretrained)
         elif self.model_name == 'resnet34':

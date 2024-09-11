@@ -6,6 +6,7 @@ import numpy as np
 import scaleogram as scg
 
 from scipy.io import wavfile
+from scipy.fft import fft
 
 object_names = ['big_drone', 'bird', 'free_space', 'human', 'small_copter']
 
@@ -61,7 +62,7 @@ def create_object_folders(empty_folder_path, object_names):
         └── object_name/   Directories named after the objects, which will be created in the empty folder
 
         :param empty_folder_path: The path to the empty folder where new directories will be created.
-        :param object_names: A list of names for the directories (representing objects)
+        :param object_names: A list of names for the directories (representing objects).
         to be created inside `empty_folder_path`.
         :return: None
     """
@@ -84,11 +85,11 @@ def cut_sound(time_step, sound_path, object_cuts_folder_path, object_name=''):
     """
         Cuts the specified '.wav' audio file into segments of a specified length and saves them.
 
-        :param time_step: The length of each audio segment in seconds
+        :param time_step: The length of each audio segment in seconds.
         :param sound_path: The file path to the original audio file.
         Signal is assumed to be a 1-dimensional array or list containing the audio data.
-        :param object_cuts_folder_path: The folder where the audio segments will be saved
-        :param object_name: (Optional) The name of the object recorded in the audio file
+        :param object_cuts_folder_path: The folder where the audio segments will be saved.
+        :param object_name: (Optional) The name of the object recorded in the audio file.
         :return: None
     """
 
@@ -129,9 +130,9 @@ def cut_original_data(time_step, original_data_path, cuts_folder_path, object_na
         └── object_names/   Folder where the audio segments will be stored
             └── audio_segments/
 
-        :param time_step: The length of each audio segment in seconds
-        :param original_data_path: The directory where the original audios are stored
-        :param cuts_folder_path: The directory where the audio segments will be stored
+        :param time_step: The length of each audio segment in seconds.
+        :param original_data_path: The directory where the original audios are stored.
+        :param cuts_folder_path: The directory where the audio segments will be stored.
         :param object_names: A list of names for the directories (representing objects)
         to be created inside `empty_folder_path`.
         :return: None
@@ -164,7 +165,7 @@ def get_scaleogram(signal, sample_rate, spectrum=None, wavelet=None, scales=None
         :param wavelet: (Optional) The type of wavelet to use for the wavelet transform.
         If None, a default wavelet will be selected.
         :param scales: (Optional) A list or array of scales to use for the wavelet transform.
-        :return: The scaleogram data
+        :return: The scaleogram data.
     """
     if scales is None:
         scales = []
@@ -193,8 +194,8 @@ def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp'):
         └── object_names/   Folder where the audio segments will be stored
             └── audio_segments/
 
-        :param cuts_folder_path: The directory where the audio segments are stored
-        :param json_path: Path to the JSON file where scaleogram will be saved
+        :param cuts_folder_path: The directory where the audio segments are stored.
+        :param json_path: Path to the JSON file where scaleogram will be saved.
         :param wavelet: (Optional) The type of wavelet to use for the wavelet transform.
             If None, a default wavelet will be selected.
         :param spectrum: (Optional) Specifies the type of spectrum to be used for the wavelet transform.
@@ -203,8 +204,8 @@ def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp'):
     """
 
     scaleograms = []
-    for object_dir in object_names:
-        object_sounds = os.path.join(cuts_folder_path, object_dir)
+    for object_name in object_names:
+        object_sounds = os.path.join(cuts_folder_path, object_name)
 
         for object_sound in os.listdir(object_sounds):
             object_sound_path = os.path.join(object_sounds, object_sound)
@@ -227,7 +228,7 @@ def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp'):
             elif spectrum == 'all':
                 values = np.concatenate((real, imag, absolute))
 
-            to_json = {'object': object_dir, 'coefs': values.tolist()}
+            to_json = {'object': object_name, 'coefs': values.tolist()}
             scaleograms.append(to_json)
 
     save_json(json_path, scaleograms)
@@ -314,3 +315,63 @@ def normalize_scaleogram(coefs):
     normalized_image = normalized_coefs.astype(np.uint8)
 
     return normalized_image
+
+
+def get_spectrogram(sample_rate, signal):
+    """
+        Computes the spectrogram of the input signal with overlapping intervals.
+
+        :param sample_rate: The sample rate of the input signal.
+        :param signal: The input signal data.
+        :return: A 2D array representing the spectrogram in decibels (dB).
+    """
+
+    epsilon = 1e-10
+
+    interval = 4 * sample_rate // 125
+
+    if signal.ndim > 1:
+        signal = signal.mean(axis=1)
+
+    signal_size = signal.shape[0]
+
+    overlap = interval // 16
+    slice_db = np.empty((signal_size // overlap, interval // 2))
+
+    for i in range(0, signal_size, overlap):
+        to_fft = signal[i: i + interval].copy()
+        transformed_frame = np.abs(fft(to_fft, interval))[0:interval // 2] + epsilon
+        transformed_frame_db = 20 * np.log10(transformed_frame)
+        slice_db[i // overlap] = transformed_frame_db
+
+    return slice_db.T
+
+
+def save_spectrograms(cuts_folder_path, json_path):
+    """
+        Saves all spectrograms of segments into JSON file.
+
+        cuts_folder_path/
+        └── object_names/   Folder where the audio segments will be stored
+            └── audio_segments/
+
+        :param cuts_folder_path: The directory where the audio segments are stored.
+        :param json_path: Path to the JSON file where scaleogram will be saved.
+        :return: None
+    """
+    spectrograms = []
+    for object_name in object_names:
+        object_sounds = os.path.join(cuts_folder_path, object_name)
+
+        for object_sound in os.listdir(object_sounds):
+            object_sound_path = os.path.join(object_sounds, object_sound)
+
+            sample_rate, signal = get_signal(object_sound_path)
+            spectrogram = get_spectrogram(sample_rate, signal)
+
+            values = spectrogram[:50, :]
+
+            to_json = {'object': object_name, 'coefs': values.tolist()}
+            spectrograms.append(to_json)
+
+    save_json(json_path, spectrograms)

@@ -19,7 +19,7 @@ class DroneDataset(Dataset):
                json_path : str
                    Path to the JSON file containing image data and corresponding labels.
                transform : optional
-                Optional transform to be applied on a image.
+                Optional transform to be applied on an image.
        """
 
         self.data = load_json(json_path)
@@ -68,7 +68,7 @@ def get_loader(dataset_path: str, batch=20, transform=None):
         batch_size : int, default is 20
             Number of samples per batch to load.
         transform : callable, optional
-            Optional transform to be applied on a image.
+            Optional transform to be applied on an image.
 
         Returns:
         --------
