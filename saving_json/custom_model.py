@@ -55,7 +55,7 @@ class CustomModel:
         self.model.to(self.device)
 
     def train_model(self, train_loader: DataLoader, valid_loader: DataLoader, epochs: int = 20, learning_rate=0.01,
-                    save=True, save_config=True):
+                    save=True, save_config=True, stop_loss=0.001):
         """
             Trains the model using the provided training and validation datasets,
             with options to save the model and its configuration.
@@ -82,6 +82,8 @@ class CustomModel:
         optimizer = torch.optim.Adam(self.model.parameters(), lr=learning_rate)
 
         avg_loss = 1
+        val_accuracy = 0
+        epochs_trained = epochs
 
         for epoch in tqdm(range(1, epochs + 1)):
             losses = []
@@ -105,11 +107,15 @@ class CustomModel:
             val_accuracy = self.check_accuracy(valid_loader)
 
             print(f'Epoch {epoch}: Average epoch loss = {avg_loss:.4f}')
+            
+            if avg_loss < stop_loss:
+                epochs_trained = epoch
+                break
 
         end_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.model_id = str(uuid.uuid4())
 
-        self.epochs_trained += epochs
+        self.epochs_trained += epochs_trained
 
         if save:
             self.save(optimizer, avg_loss)
@@ -121,7 +127,8 @@ class CustomModel:
                 "end_time": end_time,
                 "epoch": self.epochs_trained,
                 "loss": avg_loss,
-                "tranform": self.transform_type
+                "accuracy": val_accuracy,
+                "transform": self.transform_type
             }
 
             config_filepath = "conf.json"
@@ -145,7 +152,7 @@ class CustomModel:
             Parameters:
             -----------
                 loader : DataLoader
-                A DataLoader object containing the dataset over which the accuracy  will be calculated.
+                A DataLoader object containing the dataset over which the accuracy will be calculated.
             Returns:
             --------
                 float:
@@ -164,7 +171,7 @@ class CustomModel:
                 num_samples += predictions.size(0)
 
         accuracy = float(num_correct / num_samples)
-        print(f'Accuracy: {accuracy * 100:.5f}%')
+        print(f'Accuracy: {accuracy * 100:.7f}%')
 
         return accuracy
 

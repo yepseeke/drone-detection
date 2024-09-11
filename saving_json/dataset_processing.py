@@ -328,21 +328,21 @@ def get_spectrogram(sample_rate, signal):
 
     epsilon = 1e-10
 
-    interval = 4 * sample_rate // 125
+    interval = 8 * sample_rate // 125
 
     if signal.ndim > 1:
         signal = signal.mean(axis=1)
 
     signal_size = signal.shape[0]
 
-    overlap = interval // 16
+    overlap = interval // 32
     slice_db = np.empty((signal_size // overlap, interval // 2))
 
     for i in range(0, signal_size, overlap):
         to_fft = signal[i: i + interval].copy()
         transformed_frame = np.abs(fft(to_fft, interval))[0:interval // 2] + epsilon
-        transformed_frame_db = 20 * np.log10(transformed_frame)
-        slice_db[i // overlap] = transformed_frame_db
+        # transformed_frame_db = 20 * np.log10(transformed_frame)
+        slice_db[i // overlap] = transformed_frame
 
     return slice_db.T
 
