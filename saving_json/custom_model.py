@@ -220,11 +220,11 @@ class CustomModel:
 
         return cm
 
-    def plot_confusion_matrix(self, ax, loader: DataLoader, cmap='viridis'):
-        cm = self.confusion_matrix(loader)
-
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        disp.plot(ax=ax, cmap=cmap, colorbar=False)
+    # def plot_confusion_matrix(self, ax, loader: DataLoader, cmap='viridis'):
+    #     cm = self.confusion_matrix(loader)
+    #
+    #     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+    #     disp.plot(ax=ax, cmap=cmap, colorbar=False)
 
     def _get_model(self):
         model = None

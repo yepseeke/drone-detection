@@ -3,9 +3,10 @@ import json
 import shutil
 
 import numpy as np
+from lmdb.tool import delta
 
 from scipy.io import wavfile
-from signal_processing import get_signal, get_scaleogram, get_spectrogram
+from signal_processing import get_signal, get_scaleogram, get_spectrogram, get_deltas_spectrogram
 
 object_names = ['big_drone', 'bird', 'free_space', 'human', 'small_copter']
 
@@ -274,7 +275,7 @@ def normalize_data(coefs):
     return normalized_image
 
 
-def save_spectrograms(cuts_folder_path, json_path):
+def save_spectrograms(cuts_folder_path, json_path, is_deltas=True):
     """
         Saves all spectrograms of segments into JSON file.
 
@@ -284,6 +285,7 @@ def save_spectrograms(cuts_folder_path, json_path):
 
         :param cuts_folder_path: The directory where the audio segments are stored.
         :param json_path: Path to the JSON file where scaleogram will be saved.
+        :param is_deltas: If True adds deltas arrays to the data that will be stored.
         :return: None
     """
     spectrograms = []
@@ -296,7 +298,13 @@ def save_spectrograms(cuts_folder_path, json_path):
             sample_rate, signal = get_signal(object_sound_path)
             spectrogram = get_spectrogram(sample_rate, signal)
 
-            values = spectrogram[:50, :]
+            spectrogram_slice = spectrogram[:, :50]
+            values = spectrogram_slice
+
+            if is_deltas:
+                delta, delta_delta = get_deltas_spectrogram(spectrogram_slice)
+                values = np.concatenate((spectrogram_slice.T, delta.T, delta_delta.T), axis=1)
+                print(values.shape)
 
             to_json = {'object': object_name, 'coefs': values.tolist()}
             spectrograms.append(to_json)

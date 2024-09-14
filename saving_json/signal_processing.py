@@ -3,6 +3,7 @@ import numpy as np
 
 from scipy.io import wavfile
 from scipy.fft import fft
+from torchaudio.compliance.kaldi import spectrogram
 
 
 def get_signal(sound_path: str):
@@ -53,7 +54,7 @@ def get_spectrogram(sample_rate, signal):
 
         :param sample_rate: The sample rate of the input signal.
         :param signal: The input signal data.
-        :return: A 2D array representing the spectrogram in decibels (dB).
+        :return: A 2D array representing the spectrogram.
     """
 
     epsilon = 1e-10
@@ -65,13 +66,24 @@ def get_spectrogram(sample_rate, signal):
 
     signal_size = signal.shape[0]
 
-    overlap = interval // 32
-    slice_db = np.empty((signal_size // overlap, interval // 2))
+    overlap = interval // 16
+    slices = np.empty((signal_size // overlap, interval // 2))
 
     for i in range(0, signal_size, overlap):
         to_fft = signal[i: i + interval].copy()
         transformed_frame = np.abs(fft(to_fft, interval))[0:interval // 2] + epsilon
-        # transformed_frame_db = 20 * np.log10(transformed_frame)
-        slice_db[i // overlap] = transformed_frame
+        slices[i // overlap] = transformed_frame
 
-    return slice_db.T
+    return slices
+
+
+def get_deltas_spectrogram(spectrogram):
+
+    delta = np.diff(spectrogram, axis=1)
+    zero_column = np.zeros((spectrogram.shape[0], 1))
+    delta = np.hstack([zero_column, delta])
+
+    delta_delta = np.diff(delta, axis=1)
+    delta_delta = np.hstack([zero_column, delta_delta])
+
+    return delta, delta_delta
