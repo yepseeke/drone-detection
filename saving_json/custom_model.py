@@ -1,18 +1,20 @@
 import os
 import torch
 import uuid
+import numpy as np
 
 import torchvision.models as models
 import torch.nn as nn
 
 from torch.utils.data import DataLoader
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from tqdm import tqdm
 from datetime import datetime
 
 from dataset_processing import load_json, save_json
 
 
-# TODO add FFT, get rid of permutations
+# TODO get rid of permutations
 class CustomModel:
     """
     The CustomModel class represents a customizable model designed for working with various architectures and data
@@ -90,7 +92,7 @@ class CustomModel:
 
             self.model.train()
             for batch_idx, (data, targets) in enumerate(train_loader):
-                data, targets = data.to(device=self.device), targets.to(device=self.device)
+                data, targets = data.to(self.device), targets.to(self.device)
                 # TODO fix permute
                 data = data.permute(0, 3, 1, 2).float()
                 scores = self.model(data)
@@ -107,7 +109,7 @@ class CustomModel:
             val_accuracy = self.check_accuracy(valid_loader)
 
             print(f'Epoch {epoch}: Average epoch loss = {avg_loss:.4f}')
-            
+
             if avg_loss < stop_loss:
                 epochs_trained = epoch
                 break
@@ -143,7 +145,7 @@ class CustomModel:
     # TODO: update model_id, model_name, transform_type
     def load_weights(self, weights_path: str):
         checkpoint = torch.load(weights_path)
-        self.model.load_state_dict(checkpoint)
+        self.model.load_state_dict(checkpoint['model_state_dict'])
 
     def check_accuracy(self, loader: DataLoader):
         """
@@ -191,11 +193,38 @@ class CustomModel:
         checkpoint_filepath = os.path.join('models', checkpoint_filename)
 
         torch.save({
-            'epoch': self.epochs_trained,
+            'model_id': self.model_id,
             'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
-            'loss': loss,
+            'optimizer_state_dict': optimizer.state_dict()
         }, checkpoint_filepath)
+
+    def confusion_matrix(self, loader: DataLoader):
+        all_preds = []
+        all_targets = []
+
+        with torch.no_grad():
+            for data, targets in loader:
+                data, targets = data.to(self.device), targets.to(self.device)
+                data = data.permute(0, 3, 1, 2).float()
+
+                scores = self.model(data)
+                _, preds = scores.max(1)
+
+                all_preds.append(preds.cpu().numpy())
+                all_targets.append(targets.cpu().numpy())
+
+        all_preds = np.concatenate(all_preds)
+        all_targets = np.concatenate(all_targets)
+
+        cm = confusion_matrix(all_targets, all_preds)
+
+        return cm
+
+    def plot_confusion_matrix(self, ax, loader: DataLoader, cmap='viridis'):
+        cm = self.confusion_matrix(loader)
+
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(ax=ax, cmap=cmap, colorbar=False)
 
     def _get_model(self):
         model = None
@@ -240,7 +269,7 @@ class CustomModel:
 
         if 'resnet' in self.model_name:
             model.fc = nn.Linear(model.fc.in_features, self.num_classes)
-        elif 'densetnet' in self.model_name:
+        elif 'densenet' in self.model_name:
             model.classifier = nn.Linear(model.classifier.in_features, self.num_classes)
         else:
             model.classifier[6] = nn.Linear(model.classifier[6].in_features, self.num_classes)

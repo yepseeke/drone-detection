@@ -5,7 +5,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 
-from dataset_processing import load_json, normalize_scaleogram, convert_gray2rgb, from_string_to_label
+from dataset_processing import load_json, normalize_data, convert_gray2rgb, from_string_to_label
 
 
 class DroneDataset(Dataset):
@@ -45,7 +45,7 @@ class DroneDataset(Dataset):
                 Numerical label associated with the image.
         """
         image_arr = np.array(self.data[index].get('coefs'))
-        normalized_image = normalize_scaleogram(image_arr)
+        normalized_image = normalize_data(image_arr)
         normalized_rgb_image = convert_gray2rgb(normalized_image)
 
         object_label = from_string_to_label(self.data[index].get('object'))
