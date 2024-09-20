@@ -107,9 +107,7 @@ class CustomModel:
 
             avg_loss = sum(losses) / len(losses)
 
-            val_accuracy = self.calculate_accuracy(valid_loader)
-            val_precision = self.calculate_precision(valid_loader)
-            val_recall = self.calculate_recall(valid_loader)
+            val_accuracy, val_precision, val_recall = self.calculate_metrics(valid_loader)
 
             print(f'Accuracy: {val_accuracy}, Precision: {val_precision}, Recall: {val_recall}.')
 
