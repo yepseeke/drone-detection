@@ -42,8 +42,8 @@ class CustomModel:
     without loading pretrained weights.
     """
 
-    def __init__(self, model_name: str = 'resnet18', num_classes: int = 10, transform_type: str = 'wavelet=cmor1.2-3',
-                 pretrained: bool = True):
+    def __init__(self, model_name: str = 'resnet18', num_classes: int = 5, transform_type: str = 'wavelet=cmor1.2-3',
+                 pretrained: bool = True, device='cpu'):
         self.model_name = model_name.lower()
         self.model_id = str(uuid.uuid4())
 
@@ -52,7 +52,7 @@ class CustomModel:
         self.pretrained = pretrained
         self.epochs_trained = 0
 
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device = torch.device(device)
 
         self.model = self._get_model()
         self.model.to(self.device)
@@ -150,21 +150,32 @@ class CustomModel:
                 data = [new_entry]
             save_json(config_filepath, data)
 
-    def load(self, model_path: str):
-        checkpoint = torch.load(model_path)
+    def load(self, model_path: str, device='cpu'):
+        checkpoint = torch.load(model_path, map_location=device)
+        if not checkpoint.get('model_name'):
+            raise Exception('Unable to get model name.')
+        self.model_name = checkpoint['model_name']
+
+        if not checkpoint.get('transform'):
+            raise Exception('Unable to load data transformation.')
+        self.transform_type = checkpoint['transform']
+
+        self.num_classes = checkpoint.get('num_classes', 5)
+        if not checkpoint.get('num_classes'):
+            print('Unable to load number of classes. The value is set to 5.')
+
+        self.model = self._get_model()
+
         if not checkpoint.get('model_state_dict'):
-            raise Exception('Enable to load model.')
+            raise Exception('Unable to load model.')
         model_state_dict = checkpoint['model_state_dict']
         self.model.load_state_dict(model_state_dict)
 
-        if checkpoint.get('model_id'):
-            self.model_id = checkpoint['model_id']
-        if checkpoint.get('model_name'):
-            self.model_name = checkpoint['model_name']
+        self.model_id = checkpoint.get('model_id', str(uuid.uuid4()))
+
         if checkpoint.get('epochs'):
             self.epochs_trained = checkpoint['epochs']
-        if checkpoint.get('transform'):
-            self.transform_type = checkpoint['transform']
+
         if checkpoint.get('optimizer_state_dict'):
             pass
 
@@ -177,6 +188,7 @@ class CustomModel:
         print(f'Model id: {self.model_id}')
         print(f'Model name: {self.model_name}')
         print(f'Epochs trained: {self.epochs_trained}')
+        print(f'Num of classes: {self.num_classes}')
         print(f'Transform type: {self.transform_type}')
         print(self.model)
 
@@ -191,6 +203,8 @@ class CustomModel:
         torch.save({
             'model_id': self.model_id,
             'model_name': self.model_name,
+            'num_classes': self.num_classes,
+            'transform': self.transform_type,
             'epochs': self.epochs_trained,
             'model_state_dict': self.model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict()
