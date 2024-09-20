@@ -13,6 +13,10 @@ def get_signal(sound_path: str):
         :return: samplerate and signal
     """
     samplerate, x = wavfile.read(sound_path)
+
+    if len(x.shape) > 1:
+        x = np.mean(x, axis=1)
+
     return samplerate, x
 
 

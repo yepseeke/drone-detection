@@ -42,7 +42,7 @@ class CustomModel:
     without loading pretrained weights.
     """
 
-    def __init__(self, model_name: str, num_classes: int = 10, transform_type: str = 'wavelet=cmor1.2-3',
+    def __init__(self, model_name: str = 'resnet18', num_classes: int = 10, transform_type: str = 'wavelet=cmor1.2-3',
                  pretrained: bool = True):
         self.model_name = model_name.lower()
         self.model_id = str(uuid.uuid4())
@@ -96,8 +96,7 @@ class CustomModel:
             self.model.train()
             for batch_idx, (data, targets) in enumerate(train_loader):
                 data, targets = data.to(self.device), targets.to(self.device)
-                # TODO fix permute
-                data = data.permute(0, 3, 1, 2).float()
+
                 scores = self.model(data)
                 loss = criterion(scores, targets)
 
@@ -217,43 +216,46 @@ class CustomModel:
         with torch.no_grad():
             for data, targets in loader:
                 data, targets = data.to(device=self.device), targets.to(device=self.device)
-                data = data.permute(0, 3, 1, 2).float()
+
                 scores = self.model(data)
                 _, predictions = scores.max(1)
                 num_correct += (predictions == targets).sum().item()
                 num_samples += predictions.size(0)
 
         accuracy = float(num_correct / num_samples)
-        print(f'Accuracy: {accuracy * 100:.7f}%')
 
         return accuracy
 
     def calculate_precision(self, loader):
         self.model.eval()
 
-        precision_metric = torchmetrics.Precision(num_classes=self.num_classes, average='macro', task='multiclass')
+        precision_metric = torchmetrics.Precision(num_classes=self.num_classes,
+                                                  average='macro', task='multiclass').to(self.device)
         for data, targets in loader:
-            data = data.permute(0, 3, 1, 2).float()
+            data, targets = data.to(self.device), targets.to(self.device)
+
             scores = self.model(data)
             _, preds = torch.max(scores, 1)
 
             precision_metric.update(preds, targets)
 
-        precision = precision_metric.compute()
+        precision = precision_metric.compute().item()
         return precision
 
     def calculate_recall(self, loader):
         self.model.eval()
 
-        recall_metric = torchmetrics.Recall(num_classes=self.num_classes, average='macro', task='multiclass')
+        recall_metric = torchmetrics.Recall(num_classes=self.num_classes, average='macro',
+                                            task='multiclass').to(self.device)
         for data, targets in loader:
-            data = data.permute(0, 3, 1, 2).float()
+            data, targets = data.to(self.device), targets.to(self.device)
+
             scores = self.model(data)
             _, preds = torch.max(scores, 1)
 
             recall_metric.update(preds, targets)
 
-        recall = recall_metric.compute()
+        recall = recall_metric.compute().item()
         return recall
 
     def confusion_matrix(self, loader: DataLoader):
@@ -263,7 +265,6 @@ class CustomModel:
         with torch.no_grad():
             for data, targets in loader:
                 data, targets = data.to(self.device), targets.to(self.device)
-                data = data.permute(0, 3, 1, 2).float()
 
                 scores = self.model(data)
                 _, preds = scores.max(1)
