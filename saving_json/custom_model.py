@@ -15,7 +15,6 @@ from datetime import datetime
 from dataset_processing import load_json, save_json
 
 
-# TODO get rid of permutations
 class CustomModel:
     """
     The CustomModel class represents a customizable model designed for working with various architectures and data
@@ -211,6 +210,34 @@ class CustomModel:
         }, checkpoint_filepath)
 
     # Calculation of metrics:
+    def calculate_metrics(self, loader: DataLoader):
+        self.model.eval()
+
+        recall_metric = torchmetrics.Recall(num_classes=self.num_classes, average='macro',
+                                            task='multiclass').to(self.device)
+        precision_metric = torchmetrics.Precision(num_classes=self.num_classes,
+                                                  average='macro', task='multiclass').to(self.device)
+        num_correct = 0
+        num_samples = 0
+
+        for data, targets in loader:
+            data, targets = data.to(self.device), targets.to(self.device)
+
+            scores = self.model(data)
+            _, predictions = scores.max(1)
+
+            num_correct += (predictions == targets).sum().item()
+            num_samples += predictions.size(0)
+
+            precision_metric.update(predictions, targets)
+            recall_metric.update(predictions, targets)
+
+        accuracy = float(num_correct / num_samples)
+        precision = precision_metric.compute().item()
+        recall = recall_metric.compute().item()
+
+        return accuracy, precision, recall
+
     def calculate_accuracy(self, loader: DataLoader):
         """
             Evaluates the accuracy of the model on the provided dataset.
