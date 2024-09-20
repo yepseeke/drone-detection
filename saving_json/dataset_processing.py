@@ -3,7 +3,6 @@ import json
 import shutil
 
 import numpy as np
-from lmdb.tool import delta
 
 from scipy.io import wavfile
 from signal_processing import get_signal, get_scaleogram, get_spectrogram, get_deltas_spectrogram
@@ -70,7 +69,7 @@ def create_object_folders(empty_folder_path, object_names):
         os.mkdir(object_path)
 
 
-def cut_sound(time_step, sound_path, object_cuts_folder_path, object_name=''):
+def cut_and_save_sound(time_step, sound_path, object_cuts_folder_path, object_name=''):
     """
         Cuts the specified '.wav' audio file into segments of a specified length and saves them.
 
@@ -106,7 +105,7 @@ def cut_sound(time_step, sound_path, object_cuts_folder_path, object_name=''):
         wavfile.write(cut_sound_path, sample_rate, cut_sounds)
 
 
-def cut_original_data(time_step, original_data_path, cuts_folder_path, object_names):
+def cut_original_data(time_step, original_data_path, cuts_folder_path, object_names=object_names):
     """
         Cuts original sounds into segments and saves them as '.wav' files.
 
@@ -140,7 +139,7 @@ def cut_original_data(time_step, original_data_path, cuts_folder_path, object_na
             numbered_object_name = f'{object_name}_{object_sound_number}'
             object_sound_path = os.path.join(object_sounds_path, object_sound)
 
-            cut_sound(time_step, object_sound_path, object_folder_path, numbered_object_name)
+            cut_and_save_sound(time_step, object_sound_path, object_folder_path, numbered_object_name)
 
 
 def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp'):
@@ -223,6 +222,27 @@ def split_sounds(cuts_folder_path, train_folder_path, valid_folder_path):
                 shutil.copy(object_path, train_group_path)
             else:
                 shutil.copy(object_path, valid_group_path)
+
+
+def split_raw_data_into_train_test(original_data_folder_path, train_folder_path, test_folder_path):
+    for object_group in os.listdir(original_data_folder_path):
+        object_group_path = os.path.join(original_data_folder_path, object_group)
+        train_group_path = os.path.join(train_folder_path, object_group)
+        test_group_path = os.path.join(test_folder_path, object_group)
+
+        if not os.path.isdir(train_group_path):
+            os.mkdir(train_group_path)
+        if not os.path.isdir(test_group_path):
+            os.mkdir(test_group_path)
+
+        object_filenames = os.listdir(object_group_path)
+        print(len(os.listdir(train_group_path)), len(os.listdir(train_group_path)) + len(os.listdir(test_group_path)))
+        # for object_name in object_filenames:
+        #     object_path = os.path.join(object_group_path, object_name)
+        #     if np.random.rand() < 0.8:
+        #         shutil.copy(object_path, train_group_path)
+        #     else:
+        #         shutil.copy(object_path, test_group_path)
 
 
 def from_string_to_label(object_name: str):

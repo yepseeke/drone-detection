@@ -4,6 +4,7 @@ import uuid
 import numpy as np
 
 import torchvision.models as models
+import torchmetrics
 import torch.nn as nn
 
 from torch.utils.data import DataLoader
@@ -41,7 +42,7 @@ class CustomModel:
     without loading pretrained weights.
     """
 
-    def __init__(self, model_name: str, num_classes: int = 10, transform_type: str = 'wavelet-cmor1.2-3',
+    def __init__(self, model_name: str, num_classes: int = 10, transform_type: str = 'wavelet=cmor1.2-3',
                  pretrained: bool = True):
         self.model_name = model_name.lower()
         self.model_id = str(uuid.uuid4())
@@ -56,8 +57,8 @@ class CustomModel:
         self.model = self._get_model()
         self.model.to(self.device)
 
-    def train_model(self, train_loader: DataLoader, valid_loader: DataLoader, epochs: int = 20, learning_rate=0.01,
-                    save=True, save_config=True, stop_loss=0.001):
+    def train(self, train_loader: DataLoader, valid_loader: DataLoader, epochs: int = 20, learning_rate=0.01,
+              save=True, save_config=True, stop_loss=0.001):
         """
             Trains the model using the provided training and validation datasets,
             with options to save the model and its configuration.
@@ -85,6 +86,8 @@ class CustomModel:
 
         avg_loss = 1
         val_accuracy = 0
+        val_precision = 0
+        val_recall = 0
         epochs_trained = epochs
 
         for epoch in tqdm(range(1, epochs + 1)):
@@ -106,7 +109,11 @@ class CustomModel:
 
             avg_loss = sum(losses) / len(losses)
 
-            val_accuracy = self.check_accuracy(valid_loader)
+            val_accuracy = self.calculate_accuracy(valid_loader)
+            val_precision = self.calculate_precision(valid_loader)
+            val_recall = self.calculate_recall(valid_loader)
+
+            print(f'Accuracy: {val_accuracy}, Precision: {val_precision}, Recall: {val_recall}.')
 
             print(f'Epoch {epoch}: Average epoch loss = {avg_loss:.4f}')
 
@@ -120,17 +127,19 @@ class CustomModel:
         self.epochs_trained += epochs_trained
 
         if save:
-            self.save(optimizer, avg_loss)
+            self.save(optimizer)
 
         if save_config:
             new_entry = {
-                "model_id": self.model_id,
-                "model_name": self.model_name,
-                "end_time": end_time,
-                "epoch": self.epochs_trained,
-                "loss": avg_loss,
-                "accuracy": val_accuracy,
-                "transform": self.transform_type
+                'model_id': self.model_id,
+                'model_name': self.model_name,
+                'end_time': end_time,
+                'epoch': self.epochs_trained,
+                'loss': avg_loss,
+                'accuracy': val_accuracy,
+                'precision': val_precision,
+                'recall': val_recall,
+                'transform': self.transform_type
             }
 
             config_filepath = "conf.json"
@@ -142,12 +151,54 @@ class CustomModel:
                 data = [new_entry]
             save_json(config_filepath, data)
 
-    # TODO: update model_id, model_name, transform_type
-    def load_weights(self, weights_path: str):
-        checkpoint = torch.load(weights_path)
-        self.model.load_state_dict(checkpoint['model_state_dict'])
+    def load(self, model_path: str):
+        checkpoint = torch.load(model_path)
+        if not checkpoint.get('model_state_dict'):
+            raise Exception('Enable to load model.')
+        model_state_dict = checkpoint['model_state_dict']
+        self.model.load_state_dict(model_state_dict)
 
-    def check_accuracy(self, loader: DataLoader):
+        if checkpoint.get('model_id'):
+            self.model_id = checkpoint['model_id']
+        if checkpoint.get('model_name'):
+            self.model_name = checkpoint['model_name']
+        if checkpoint.get('epochs'):
+            self.epochs_trained = checkpoint['epochs']
+        if checkpoint.get('transform'):
+            self.transform_type = checkpoint['transform']
+        if checkpoint.get('optimizer_state_dict'):
+            pass
+
+    def update_device(self, device_name):
+        self.device = torch.device(device_name if torch.cuda.is_available() else 'cpu')
+        self.model.to(self.device)
+
+    def summary(self):
+        print('Info:')
+        print(f'Model id: {self.model_id}')
+        print(f'Model name: {self.model_name}')
+        print(f'Epochs trained: {self.epochs_trained}')
+        print(f'Transform type: {self.transform_type}')
+        print(self.model)
+
+    def save(self, optimizer):
+        checkpoint_filename = f'{self.model_id}.pth'
+
+        if not os.path.isdir('models'):
+            os.mkdir('models')
+
+        checkpoint_filepath = os.path.join('models', checkpoint_filename)
+
+        torch.save({
+            'model_id': self.model_id,
+            'model_name': self.model_name,
+            'epochs': self.epochs_trained,
+            'model_state_dict': self.model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict()
+        }, checkpoint_filepath)
+
+    # Calculation of metrics:
+    def calculate_accuracy(self, loader: DataLoader):
         """
             Evaluates the accuracy of the model on the provided dataset.
 
@@ -164,12 +215,12 @@ class CustomModel:
         self.model.eval()
 
         with torch.no_grad():
-            for x, y in loader:
-                x, y = x.to(device=self.device), y.to(device=self.device)
-                x = x.permute(0, 3, 1, 2).float()
-                scores = self.model(x)
+            for data, targets in loader:
+                data, targets = data.to(device=self.device), targets.to(device=self.device)
+                data = data.permute(0, 3, 1, 2).float()
+                scores = self.model(data)
                 _, predictions = scores.max(1)
-                num_correct += (predictions == y).sum().item()
+                num_correct += (predictions == targets).sum().item()
                 num_samples += predictions.size(0)
 
         accuracy = float(num_correct / num_samples)
@@ -177,26 +228,33 @@ class CustomModel:
 
         return accuracy
 
-    def update_device(self, device_name):
-        self.device = torch.device(device_name if torch.cuda.is_available() else 'cpu')
-        self.model.to(self.device)
+    def calculate_precision(self, loader):
+        self.model.eval()
 
-    def summary(self):
-        print(self.model)
+        precision_metric = torchmetrics.Precision(num_classes=self.num_classes, average='macro', task='multiclass')
+        for data, targets in loader:
+            data = data.permute(0, 3, 1, 2).float()
+            scores = self.model(data)
+            _, preds = torch.max(scores, 1)
 
-    def save(self, optimizer, loss):
-        checkpoint_filename = f'{self.model_id}.pth'
+            precision_metric.update(preds, targets)
 
-        if not os.path.isdir('models'):
-            os.mkdir('models')
+        precision = precision_metric.compute()
+        return precision
 
-        checkpoint_filepath = os.path.join('models', checkpoint_filename)
+    def calculate_recall(self, loader):
+        self.model.eval()
 
-        torch.save({
-            'model_id': self.model_id,
-            'model_state_dict': self.model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict()
-        }, checkpoint_filepath)
+        recall_metric = torchmetrics.Recall(num_classes=self.num_classes, average='macro', task='multiclass')
+        for data, targets in loader:
+            data = data.permute(0, 3, 1, 2).float()
+            scores = self.model(data)
+            _, preds = torch.max(scores, 1)
+
+            recall_metric.update(preds, targets)
+
+        recall = recall_metric.compute()
+        return recall
 
     def confusion_matrix(self, loader: DataLoader):
         all_preds = []

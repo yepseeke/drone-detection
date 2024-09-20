@@ -3,7 +3,6 @@ import numpy as np
 
 from scipy.io import wavfile
 from scipy.fft import fft
-from torchaudio.compliance.kaldi import spectrogram
 
 
 def get_signal(sound_path: str):
@@ -78,7 +77,6 @@ def get_spectrogram(sample_rate, signal):
 
 
 def get_deltas_spectrogram(spectrogram):
-
     delta = np.diff(spectrogram, axis=1)
     zero_column = np.zeros((spectrogram.shape[0], 1))
     delta = np.hstack([zero_column, delta])
