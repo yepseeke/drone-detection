@@ -80,9 +80,9 @@ def get_spectrogram(sample_rate, signal):
     return slices
 
 
-def get_deltas_spectrogram(spectrogram):
-    delta = np.diff(spectrogram, axis=1)
-    zero_column = np.zeros((spectrogram.shape[0], 1))
+def get_deltas_of_data(coeffs):
+    delta = np.diff(coeffs, axis=1)
+    zero_column = np.zeros((coeffs.shape[0], 1))
     delta = np.hstack([zero_column, delta])
 
     delta_delta = np.diff(delta, axis=1)

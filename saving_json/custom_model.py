@@ -9,6 +9,7 @@ import torch.nn as nn
 
 from torch.utils.data import DataLoader
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from torchvision import transforms
 from tqdm import tqdm
 from datetime import datetime
 
@@ -41,6 +42,7 @@ class CustomModel:
     without loading pretrained weights.
     """
 
+    # TODO what should i do with time_step and image_size?
     def __init__(self, model_name: str = 'resnet18', num_classes: int = 5, transform_type: str = 'wavelet=cmor1.2-3',
                  pretrained: bool = True, device='cpu'):
         self.model_name = model_name.lower()
@@ -157,9 +159,9 @@ class CustomModel:
             raise Exception('Unable to load data transformation.')
         self.transform_type = checkpoint['transform']
 
-        self.num_classes = checkpoint.get('num_classes', 5)
+        # self.num_classes = checkpoint.get('num_classes', 5)
         if not checkpoint.get('num_classes'):
-            print('Unable to load number of classes. The value is set to 5.')
+            raise Exception('Unable to load number of classes.')
 
         self.model = self._get_model()
 
@@ -317,6 +319,25 @@ class CustomModel:
         cm = confusion_matrix(all_targets, all_preds)
 
         return cm
+
+    def predict(self, data):
+        """
+            Predicts the class of a given input.
+
+            :param data: Normalized 3d scaleogram/spectrogram data.
+            :return: Index of predicted class.
+        """
+        transform = transforms.ToTensor()
+        data_tensor = transform(data)
+        data_tensor = data_tensor.unsqueeze(0)
+
+        self.model.eval()
+        with torch.no_grad():
+            outputs = self.model(data_tensor.to(self.device))
+
+        _, predicted_class = torch.max(outputs, 1)
+
+        return predicted_class.cpu().numpy()[0]
 
     # def plot_confusion_matrix(self, ax, loader: DataLoader, cmap='viridis'):
     #     cm = self.confusion_matrix(loader)

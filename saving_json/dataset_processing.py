@@ -5,7 +5,7 @@ import shutil
 import numpy as np
 
 from scipy.io import wavfile
-from signal_processing import get_signal, get_scaleogram, get_spectrogram, get_deltas_spectrogram
+from signal_processing import get_signal, get_scaleogram, get_spectrogram, get_deltas_of_data
 
 object_names = ['big_drone', 'bird', 'free_space', 'human', 'small_copter']
 
@@ -264,6 +264,11 @@ def from_string_to_label(object_name: str):
     return label_map.get(object_name, -1)
 
 
+def from_label_to_string(class_num: int):
+    labels = ['big_drone', 'bird', 'free_space', 'human', 'small_copter']
+    return labels[class_num] if 0 <= class_num < len(labels) else 'unknown_class'
+
+
 def convert_gray2rgb(image):
     """
         Converts a grayscale image to an RGB image by replicating the grayscale values across all three color channels.
@@ -295,6 +300,20 @@ def normalize_data(coefs):
     return normalized_image
 
 
+def transform_data(coefs):
+    """
+        Normalizes data from the range [0, +inf) to [0, 255] and converts the 1D image into a 3-channel RGB image
+        :param coefs: The scaleogram/spectrogram data.
+        :return: Normalized 3d scaleogram/spectrogram data.
+    """
+    # Normalizes data from the range [0, +inf) to [0, 255]
+    normalized_image = normalize_data(coefs)
+    # Converts the 1D image into a 3-channel RGB image
+    normalized_rgb_image = convert_gray2rgb(normalized_image)
+
+    return normalized_rgb_image
+
+
 def save_spectrograms(cuts_folder_path, json_path, is_deltas=True):
     """
         Saves all spectrograms of segments into JSON file.
@@ -322,7 +341,7 @@ def save_spectrograms(cuts_folder_path, json_path, is_deltas=True):
             values = spectrogram_slice
 
             if is_deltas:
-                delta, delta_delta = get_deltas_spectrogram(spectrogram_slice)
+                delta, delta_delta = get_deltas_of_data(spectrogram_slice)
                 values = np.concatenate((spectrogram_slice.T, delta.T, delta_delta.T), axis=1)
                 print(values.shape)
 
