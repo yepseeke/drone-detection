@@ -320,6 +320,26 @@ class CustomModel:
 
         return cm
 
+    def calculate_precision_recall_per_class(self, loader: DataLoader):
+        cm = self.confusion_matrix(loader)
+        num_classes = cm.shape[0]
+
+        precision_per_class = {}
+        recall_per_class = {}
+
+        for i in range(num_classes):
+            tp = cm[i, i]
+            fp = cm[:, i].sum() - tp
+            fn = cm[i, :].sum() - tp
+
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+
+            precision_per_class[i] = precision
+            recall_per_class[i] = recall
+
+        return precision_per_class, recall_per_class
+
     def predict(self, data):
         """
             Predicts the class of a given input.

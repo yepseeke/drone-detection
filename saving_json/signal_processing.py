@@ -89,3 +89,10 @@ def get_deltas_of_data(coeffs):
     delta_delta = np.hstack([zero_column, delta_delta])
 
     return delta, delta_delta
+
+
+def save_signal_to_wav(signal, sample_rate, folder_path):
+    signal = signal / np.max(np.abs(signal))
+    signal = np.int16(signal * 32767)
+
+    wavfile.write(folder_path, sample_rate, signal)

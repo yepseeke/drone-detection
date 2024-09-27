@@ -3,9 +3,10 @@ import json
 import shutil
 
 import numpy as np
+from nltk.metrics.aline import delta
 
 from scipy.io import wavfile
-from signal_processing import get_signal, get_scaleogram, get_spectrogram, get_deltas_of_data
+from signal_processing import get_signal, get_scaleogram, get_spectrogram, get_deltas_of_data, save_signal_to_wav
 
 object_names = ['big_drone', 'bird', 'free_space', 'human', 'small_copter']
 
@@ -142,7 +143,7 @@ def cut_original_data(time_step, original_data_path, cuts_folder_path, object_na
             cut_and_save_sound(time_step, object_sound_path, object_folder_path, numbered_object_name)
 
 
-def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp'):
+def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp', is_deltas=False):
     """
         Saves all scaleograms of segments into JSON file.
         The function takes every (sample_rate / 1000) sample to save memory.
@@ -171,9 +172,9 @@ def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp'):
             coefs, _ = get_scaleogram(signal, sample_rate, wavelet=wavelet)
 
             step = sample_rate // 1000
-            coefs = coefs[:, ::step]
+            slices_step = coefs[:, ::step]
 
-            real, imag, absolute = np.real(coefs), np.imag(coefs), np.abs(coefs)
+            real, imag, absolute = np.real(slices_step), np.imag(slices_step), np.abs(slices_step)
 
             values = coefs
             if spectrum == 'amp':
@@ -184,6 +185,10 @@ def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp'):
                 values = imag
             elif spectrum == 'all':
                 values = np.concatenate((real, imag, absolute))
+
+            if is_deltas:
+                delta, delta_delta = get_deltas_of_data(values)
+                values = np.concatenate((values, delta, delta_delta))
 
             to_json = {'object': object_name, 'coefs': values.tolist()}
             scaleograms.append(to_json)
@@ -349,3 +354,15 @@ def save_spectrograms(cuts_folder_path, json_path, is_deltas=True):
             spectrograms.append(to_json)
 
     save_json(json_path, spectrograms)
+
+
+def add_reversed_signals(object_cuts_folder_path):
+    object_filenames = os.listdir(object_cuts_folder_path)
+    for object_filename in object_filenames:
+        object_path = os.path.join(object_cuts_folder_path, object_filename)
+        sample_rate, signal = get_signal(object_path)
+
+        reversed_signal = signal[::-1]
+        reversed_signal_filename = f'reverse_{object_filename}'
+        reversed_signal_path = os.path.join(object_cuts_folder_path, reversed_signal_filename)
+        wavfile.write(reversed_signal_path, sample_rate, reversed_signal)
