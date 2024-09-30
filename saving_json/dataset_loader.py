@@ -57,7 +57,7 @@ class DroneDataset(Dataset):
         return normalized_rgb_image_tensor, y_label
 
 
-def get_loader(dataset_path: str, batch=20, transform=None):
+def get_loader(dataset_path: str, batch=20, pin_memory=True, num_workers=6):
     """
         Returns a DataLoader for the custom dataset.
 
@@ -77,4 +77,4 @@ def get_loader(dataset_path: str, batch=20, transform=None):
     """
     dataset = DroneDataset(dataset_path)
 
-    return DataLoader(dataset=dataset, batch_size=batch, shuffle=True)
+    return DataLoader(dataset=dataset, batch_size=batch, shuffle=True, pin_memory=pin_memory, num_workers=num_workers)

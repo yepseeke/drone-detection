@@ -58,7 +58,7 @@ class CustomModel:
         self.model = self._get_model()
         self.model.to(self.device)
 
-    def train(self, train_loader: DataLoader, valid_loader: DataLoader, epochs: int = 20, learning_rate=0.01,
+    def train(self, train_loader: DataLoader, valid_loader: DataLoader = None, epochs: int = 20, learning_rate=0.01,
               save=True, save_config=True, stop_loss=0.001):
         """
             Trains the model using the provided training and validation datasets,
@@ -96,7 +96,7 @@ class CustomModel:
 
             self.model.train()
             for batch_idx, (data, targets) in enumerate(train_loader):
-                data, targets = data.to(self.device), targets.to(self.device)
+                data, targets = data.to(self.device, non_blocking=True), targets.to(self.device, non_blocking=True)
 
                 scores = self.model(data)
                 loss = criterion(scores, targets)
@@ -164,6 +164,7 @@ class CustomModel:
             raise Exception('Unable to load number of classes.')
 
         self.model = self._get_model()
+        self.model.to(device)
 
         if not checkpoint.get('model_state_dict'):
             raise Exception('Unable to load model.')
@@ -221,7 +222,7 @@ class CustomModel:
         num_samples = 0
 
         for data, targets in loader:
-            data, targets = data.to(self.device), targets.to(self.device)
+            data, targets = data.to(self.device, non_blocking=True), targets.to(self.device, non_blocking=True)
 
             scores = self.model(data)
             _, predictions = scores.max(1)
@@ -256,7 +257,8 @@ class CustomModel:
 
         with torch.no_grad():
             for data, targets in loader:
-                data, targets = data.to(device=self.device), targets.to(device=self.device)
+                data, targets = data.to(device=self.device, non_blocking=True), targets.to(device=self.device,
+                                                                                           non_blocking=True)
 
                 scores = self.model(data)
                 _, predictions = scores.max(1)
@@ -273,7 +275,7 @@ class CustomModel:
         precision_metric = torchmetrics.Precision(num_classes=self.num_classes,
                                                   average='macro', task='multiclass').to(self.device)
         for data, targets in loader:
-            data, targets = data.to(self.device), targets.to(self.device)
+            data, targets = data.to(self.device, non_blocking=True), targets.to(self.device, non_blocking=True)
 
             scores = self.model(data)
             _, preds = torch.max(scores, 1)
@@ -289,7 +291,7 @@ class CustomModel:
         recall_metric = torchmetrics.Recall(num_classes=self.num_classes, average='macro',
                                             task='multiclass').to(self.device)
         for data, targets in loader:
-            data, targets = data.to(self.device), targets.to(self.device)
+            data, targets = data.to(self.device, non_blocking=True), targets.to(self.device, non_blocking=True)
 
             scores = self.model(data)
             _, preds = torch.max(scores, 1)
@@ -305,7 +307,7 @@ class CustomModel:
 
         with torch.no_grad():
             for data, targets in loader:
-                data, targets = data.to(self.device), targets.to(self.device)
+                data, targets = data.to(self.device, non_blocking=True), targets.to(self.device, non_blocking=True)
 
                 scores = self.model(data)
                 _, preds = scores.max(1)
@@ -353,7 +355,7 @@ class CustomModel:
 
         self.model.eval()
         with torch.no_grad():
-            outputs = self.model(data_tensor.to(self.device))
+            outputs = self.model(data_tensor.to(self.device, non_blocking=True))
 
         _, predicted_class = torch.max(outputs, 1)
 
