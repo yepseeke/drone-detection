@@ -53,9 +53,9 @@ class CustomModel:
         self.pretrained = pretrained
         self.epochs_trained = 0
 
-        self.device = torch.device(device)
-
         self.model = self._get_model()
+
+        self.device = torch.device(device)
         self.model.to(self.device)
 
     def train(self, train_loader: DataLoader, valid_loader: DataLoader = None, epochs: int = 20, learning_rate=0.01,

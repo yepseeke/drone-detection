@@ -55,11 +55,6 @@ def get_scaleogram(signal, sample_rate, spectrum=None, wavelet=None, scales=None
     return cwt.coefs, cwt.scales_freq
 
 
-import numpy as np
-from scipy.signal import resample
-from scipy.fft import fft
-
-
 def get_spectrogram(sample_rate, signal, target_sample_rate=48000):
     """
     Computes the spectrogram of the input signal with overlapping intervals.
