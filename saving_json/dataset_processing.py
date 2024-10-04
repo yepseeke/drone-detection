@@ -3,7 +3,6 @@ import json
 import shutil
 
 import numpy as np
-from nltk.metrics.aline import delta
 
 from scipy.io import wavfile
 from signal_processing import get_signal, get_scaleogram, get_spectrogram, get_deltas_of_data, save_signal_to_wav
@@ -299,6 +298,10 @@ def normalize_data(coefs):
     """
     min_coefs = np.min(coefs)
     max_coefs = np.max(coefs)
+
+    if max_coefs <= 255 and min_coefs >= 0:
+        return coefs
+
     normalized_coefs = np.int8(((coefs - min_coefs) / (max_coefs - min_coefs)) * 255)
     normalized_image = normalized_coefs.astype(np.uint8)
 
@@ -342,13 +345,11 @@ def save_spectrograms(cuts_folder_path, json_path, is_deltas=True):
             sample_rate, signal = get_signal(object_sound_path)
             spectrogram = get_spectrogram(sample_rate, signal)
 
-            spectrogram_slice = spectrogram[:, :50]
-            values = spectrogram_slice
+            values = spectrogram[:80]
 
             if is_deltas:
-                delta, delta_delta = get_deltas_of_data(spectrogram_slice)
-                values = np.concatenate((spectrogram_slice.T, delta.T, delta_delta.T), axis=1)
-                print(values.shape)
+                delta, delta_delta = get_deltas_of_data(values)
+                values = np.concatenate((values.T, delta.T, delta_delta.T), axis=1)
 
             to_json = {'object': object_name, 'coefs': values.tolist()}
             spectrograms.append(to_json)

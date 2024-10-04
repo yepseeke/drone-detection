@@ -1,7 +1,11 @@
 import scaleogram as scg
 import numpy as np
+import torch
+import torchaudio
+import torchaudio.transforms as T
 
 from scipy.io import wavfile
+from scipy.signal import resample
 from scipy.fft import fft
 
 
@@ -51,33 +55,52 @@ def get_scaleogram(signal, sample_rate, spectrum=None, wavelet=None, scales=None
     return cwt.coefs, cwt.scales_freq
 
 
-def get_spectrogram(sample_rate, signal):
-    """
-        Computes the spectrogram of the input signal with overlapping intervals.
+import numpy as np
+from scipy.signal import resample
+from scipy.fft import fft
 
-        :param sample_rate: The sample rate of the input signal.
-        :param signal: The input signal data.
-        :return: A 2D array representing the spectrogram.
+
+def get_spectrogram(sample_rate, signal, target_sample_rate=48000):
     """
+    Computes the spectrogram of the input signal with overlapping intervals.
+
+    :param sample_rate: The sample rate of the input signal.
+    :param signal: The input signal data.
+    :param target_sample_rate: The sample rate to resample the signal to (default: 48 kHz).
+    :return: A 2D array representing the spectrogram.
+    """
+
+    if sample_rate != target_sample_rate:
+        num_samples = int(len(signal) * target_sample_rate / sample_rate)
+        signal = resample(signal, num_samples)
+        sample_rate = target_sample_rate
 
     epsilon = 1e-10
+    interval = 4 * sample_rate // 125
+    overlap = interval // 32
+    signal_size = len(signal)
 
-    interval = 8 * sample_rate // 125
+    num_slices = (signal_size - interval) // overlap + 1
+    slices = np.empty((num_slices, interval // 2))
 
-    if signal.ndim > 1:
-        signal = signal.mean(axis=1)
+    for i in range(num_slices):
+        start = i * overlap
+        to_fft = signal[start:start + interval]
+        transformed_frame = np.abs(fft(to_fft, interval))[:interval // 2] + epsilon
+        slices[i] = transformed_frame
 
-    signal_size = signal.shape[0]
+    return slices.T
 
-    overlap = interval // 16
-    slices = np.empty((signal_size // overlap, interval // 2))
 
-    for i in range(0, signal_size, overlap):
-        to_fft = signal[i: i + interval].copy()
-        transformed_frame = np.abs(fft(to_fft, interval))[0:interval // 2] + epsilon
-        slices[i // overlap] = transformed_frame
+def get_mel_spectrogram(sample_rate, signal, is_log=True):
+    mel_transform = T.MelSpectrogram(sample_rate=sample_rate, n_mels=128, n_fft=4096, hop_length=128)
+    waveform = torch.tensor(signal, dtype=torch.float32)
+    values = mel_transform(waveform)
+    if is_log:
+        db_transform = T.AmplitudeToDB(values)
+        values = db_transform(values)
 
-    return slices
+    return values.squeeze().numpy()
 
 
 def get_deltas_of_data(coeffs):
