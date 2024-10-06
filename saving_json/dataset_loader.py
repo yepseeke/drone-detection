@@ -6,7 +6,8 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from dataset_processing import load_json, transform_data, from_string_to_label
+from dataset_processing import load_json, from_string_to_label
+from signal_processing import transform_data
 
 
 class DroneDataset(Dataset):

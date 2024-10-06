@@ -1,7 +1,6 @@
 import scaleogram as scg
 import numpy as np
 import torch
-import torchaudio
 import torchaudio.transforms as T
 
 from scipy.io import wavfile
@@ -24,14 +23,12 @@ def get_signal(sound_path: str):
     return samplerate, x
 
 
-def get_scaleogram(signal, sample_rate, spectrum=None, wavelet=None, scales=None):
+def get_scaleogram(sample_rate, signal, wavelet=None, scales=None):
     """
         Generates a scaleogram (a visual representation of the wavelet transform) for a given signal.
 
         :param signal: Signal is a 1-dimensional array or list containing the audio data.
         :param sample_rate: Sample rate of the signal.
-        :param spectrum: (Optional) Specifies the type of spectrum to be used for the wavelet transform.
-        It can be 'amp', 'real', 'imag'.
         :param wavelet: (Optional) The type of wavelet to use for the wavelet transform.
         If None, a default wavelet will be selected.
         :param scales: (Optional) A list or array of scales to use for the wavelet transform.
@@ -46,12 +43,6 @@ def get_scaleogram(signal, sample_rate, spectrum=None, wavelet=None, scales=None
     time = np.linspace(0, signal_length, signal.shape[0])
     cwt = scg.CWT(time=time, signal=signal, scales=scales, wavelet=wavelet)
 
-    if spectrum == 'amp':
-        return np.abs(cwt.coefs), cwt.scales_freq
-    elif spectrum == 'real':
-        return np.real(cwt.coefs), cwt.scales_freq
-    elif spectrum == 'imag':
-        return np.imag(cwt.coefs), cwt.scales_freq
     return cwt.coefs, cwt.scales_freq
 
 
@@ -88,6 +79,14 @@ def get_spectrogram(sample_rate, signal, target_sample_rate=48000):
 
 
 def get_mel_spectrogram(sample_rate, signal, is_log=True):
+    """
+    Computes the Mel spectrogram of the input signal.
+
+    :param sample_rate: The sample rate of the input signal.
+    :param signal: The input signal data.
+    :param is_log: Boolean flag to indicate if the output should be converted to logarithmic scale (default: True).
+    :return: A 2D array representing the Mel spectrogram, optionally in logarithmic scale.
+    """
     mel_transform = T.MelSpectrogram(sample_rate=sample_rate, n_mels=128, n_fft=4096, hop_length=128)
     waveform = torch.tensor(signal, dtype=torch.float32)
     values = mel_transform(waveform)
@@ -98,9 +97,17 @@ def get_mel_spectrogram(sample_rate, signal, is_log=True):
     return values.squeeze().numpy()
 
 
-def get_deltas_of_data(coeffs):
-    delta = np.diff(coeffs, axis=1)
-    zero_column = np.zeros((coeffs.shape[0], 1))
+def get_deltas_of_data(coefs):
+    """
+    Computes the first and second derivatives (deltas) of the input coefficients.
+
+    :param coefs: A 2D array of coefficients, which can represent a scaleogram, spectrogram, or mel spectrogram.
+    :return: A tuple containing:
+             - delta: The first derivative of the coefficients.
+             - delta_delta: The second derivative of the coefficients.
+    """
+    delta = np.diff(coefs, axis=1)
+    zero_column = np.zeros((coefs.shape[0], 1))
     delta = np.hstack([zero_column, delta])
 
     delta_delta = np.diff(delta, axis=1)
@@ -110,7 +117,63 @@ def get_deltas_of_data(coeffs):
 
 
 def save_signal_to_wav(signal, sample_rate, folder_path):
+    """
+    Normalizes the input signal and saves it as a WAV file.
+
+    :param signal: A 1D array of audio signal data.
+    :param sample_rate: The sample rate at which the signal was recorded.
+    :param folder_path: The file path where the WAV file will be saved.
+    """
     signal = signal / np.max(np.abs(signal))
     signal = np.int16(signal * 32767)
 
     wavfile.write(folder_path, sample_rate, signal)
+
+
+def convert_gray2rgb(image):
+    """
+        Converts a grayscale image to an RGB image by replicating the grayscale values across all three color channels.
+
+        :param image: A 2D numpy array representing the grayscale image.
+        :return: A 3D numpy array representing the RGB image, with shape (width, height, 3).
+    """
+    width, height = image.shape
+    out = np.empty((width, height, 3), dtype=np.uint8)
+    out[:, :, 0] = image
+    out[:, :, 1] = image
+    out[:, :, 2] = image
+
+    return out
+
+
+def normalize_data(coefs):
+    """
+        Normalizes the scaleogram/spectrogram data to a range of [0, 255].
+
+        :param coefs: The scaleogram/spectrogram data.
+        :return: Normalized scaleogram data.
+    """
+    min_coefs = np.min(coefs)
+    max_coefs = np.max(coefs)
+
+    if max_coefs <= 255 and min_coefs >= 0:
+        return coefs
+
+    normalized_coefs = np.int8(((coefs - min_coefs) / (max_coefs - min_coefs)) * 255)
+    normalized_image = normalized_coefs.astype(np.uint8)
+
+    return normalized_image
+
+
+def transform_data(coefs):
+    """
+        Normalizes data from the range [0, +inf) to [0, 255] and converts the 1D image into a 3-channel RGB image
+        :param coefs: The scaleogram/spectrogram data.
+        :return: Normalized 3d scaleogram/spectrogram data.
+    """
+    # Normalizes data from the range [0, +inf) to [0, 255]
+    normalized_image = normalize_data(coefs)
+    # Converts the 1D image into a 3-channel RGB image
+    normalized_rgb_image = convert_gray2rgb(normalized_image)
+
+    return normalized_rgb_image
