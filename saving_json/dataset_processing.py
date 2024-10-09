@@ -5,7 +5,7 @@ import shutil
 import numpy as np
 
 from scipy.io import wavfile
-from signal_processing import get_signal, get_scaleogram, get_spectrogram, get_deltas_of_data
+from signal_processing import get_signal, resample_signal, handle_fft_transformation, handle_wavelet_transformation
 
 # This file contains functions specifically designed to create a dataset for model training
 # by organizing audio recordings into the required folder structure.
@@ -209,6 +209,7 @@ def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp', 
             It can be 'amp', 'real', 'imag' or 'all' which returns all three spectrums at once.
         :return: None
     """
+    TARGET_SAMPLE_RATE = 48000
 
     scaleograms = []
     for object_name in object_names:
@@ -218,26 +219,9 @@ def save_scaleograms(cuts_folder_path, json_path, wavelet=None, spectrum='amp', 
             object_signal_path = os.path.join(object_signals, object_signal)
 
             sample_rate, signal = get_signal(object_signal_path)
-            coefs, _ = get_scaleogram(signal, sample_rate, wavelet=wavelet)
+            sample_rate, signal = resample_signal(sample_rate, signal, TARGET_SAMPLE_RATE)
 
-            step = sample_rate // 1000
-            slices_step = coefs[:, ::step]
-
-            real, imag, absolute = np.real(slices_step), np.imag(slices_step), np.abs(slices_step)
-
-            values = coefs
-            if spectrum == 'amp':
-                values = absolute
-            elif spectrum == 'real':
-                values = real
-            elif spectrum == 'imag':
-                values = imag
-            elif spectrum == 'all':
-                values = np.concatenate((real, imag, absolute))
-
-            if is_deltas:
-                delta, delta_delta = get_deltas_of_data(values)
-                values = np.concatenate((values, delta, delta_delta))
+            values = handle_wavelet_transformation(sample_rate, signal, wavelet=wavelet, deltas_flag=is_deltas)
 
             to_json = {'object': object_name, 'coefs': values.tolist()}
             scaleograms.append(to_json)
@@ -258,6 +242,9 @@ def save_spectrograms(cuts_folder_path, json_path, is_deltas=False):
         :param is_deltas: If True adds deltas arrays to the data that will be stored.
         :return: None
     """
+
+    TARGET_SAMPLE_RATE = 48000
+
     spectrograms = []
     for object_name in object_names:
         object_signals = os.path.join(cuts_folder_path, object_name)
@@ -266,13 +253,9 @@ def save_spectrograms(cuts_folder_path, json_path, is_deltas=False):
             object_signal_path = os.path.join(object_signals, object_signal)
 
             sample_rate, signal = get_signal(object_signal_path)
-            spectrogram = get_spectrogram(sample_rate, signal)
+            sample_rate, signal = resample_signal(sample_rate, signal, TARGET_SAMPLE_RATE)
 
-            values = spectrogram[:80]
-
-            if is_deltas:
-                delta, delta_delta = get_deltas_of_data(values)
-                values = np.concatenate((values.T, delta.T, delta_delta.T), axis=1)
+            values = handle_fft_transformation(sample_rate, signal, is_deltas)
 
             to_json = {'object': object_name, 'coefs': values.tolist()}
             spectrograms.append(to_json)

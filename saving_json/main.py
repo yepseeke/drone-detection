@@ -1,22 +1,14 @@
 import os
-import time
-
-from matplotlib import pyplot as plt
 
 from custom_model import CustomModel
-from dataset_loader import get_loader
-
-from torchvision import transforms
+from predict import predict_and_save
 
 if __name__ == '__main__':
-    cmodel = CustomModel('resnet18', transform_type='fft', num_classes=5)
+    cmodel = CustomModel(device='cuda:0')
+    cmodel.load('models/6c6c79ab-231c-40ac-a9f8-18d1114f0b12.pth', device='cuda:0')
 
-    transform = transforms.ToTensor()
-
-    train_json_path = os.path.join(os.getcwd(), r'datasets/seconds=0.2/train_valid_split/train_fft.json')
-    valid_json_path = os.path.join(os.getcwd(), r'datasets/seconds=0.2/train_valid_split/valid_fft.json')
-
-    train_loader = get_loader(train_json_path, batch=30, transform=transform)
-    valid_loader = get_loader(valid_json_path, batch=30, transform=transform)
-
-    cmodel.train(train_loader, valid_loader, epochs=1, learning_rate=0.001, save=True, save_config=True)
+    folder_path = 'to_detect'
+    files_to_detect = os.listdir(folder_path)
+    for file_to_detect in files_to_detect:
+        signal_path = f'{folder_path}/{file_to_detect}'
+        predict_and_save(signal_path, cmodel, 'csv')

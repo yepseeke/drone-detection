@@ -42,7 +42,6 @@ class CustomModel:
     without loading pretrained weights.
     """
 
-    # TODO what should i do with time_step and image_size?
     def __init__(self, model_name: str = 'resnet18', num_classes: int = 5, transform_type: str = 'wavelet=cmor1.2-3',
                  pretrained: bool = True, device='cpu'):
         self.model_name = model_name.lower()
@@ -366,6 +365,31 @@ class CustomModel:
     #
     #     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     #     disp.plot(ax=ax, cmap=cmap, colorbar=False)
+
+    def parse_transform_type(self):
+        """
+        Parses a wavelet or transformation string and extracts:
+        1. The type of transformation (wavelet or fft).
+        2. The specific wavelet type (if applicable).
+        3. Whether the 'deltas' flag is present.
+
+        :return: A tuple containing:
+                 - transformation_type: 'wavelet' or 'fft'.
+                 - specific_wavelet: The wavelet name (e.g. 'cmor1.2-3') or None if not applicable.
+                 - deltas_flag: Boolean, True if '_deltas' is present, False otherwise.
+        """
+        deltas_flag = '_deltas' in self.transform_type
+
+        wavelet_str = self.transform_type.replace('_deltas', '')
+
+        if wavelet_str.startswith('wavelet='):
+            transformation_type = 'wavelet'
+            specific_wavelet = wavelet_str.split('=')[1]
+        else:
+            transformation_type = 'fft'
+            specific_wavelet = None
+
+        return transformation_type, specific_wavelet, deltas_flag
 
     def _get_model(self):
         model = None
